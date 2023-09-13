@@ -142,7 +142,7 @@ def main():
     Prepares and solves an ocp that has quaternion in it. Animates the results
     """
 
-    ocp = prepare_ocp("models/TruncAnd2Arm_Quaternion.bioMod", n_shooting=25, final_time=0.25)
+    ocp = prepare_ocp("models/Sarah.bioMod", n_shooting=25, final_time=0.25)
     sol = ocp.solve(Solver.IPOPT(show_online_optim=platform.system() == "Linux"))
 
     # Print the last solution
