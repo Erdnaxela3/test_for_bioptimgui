@@ -114,7 +114,7 @@ def prepare_ocp(biorbd_model_path: str, final_time: float, n_shooting: int, ode_
         -0.1,
         -0.1,
         -0.1,
-        2 * np.pi - 0.1, # 1 somersault, n_somersault * 2 * np.pi
+        2 * np.pi - 0.1, # 1 somersault, n_somersault * 2 * np.pi - 0.1 (marge)
         -15 * np.pi / 180,
         2 * np.pi,
         -np.pi,

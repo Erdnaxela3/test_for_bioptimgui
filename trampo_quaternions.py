@@ -127,13 +127,13 @@ def prepare_ocp(
         bio_model,
         dynamics,
         n_shooting,
-        final_time,
+        final_time, # keep ?
         x_bounds=x_bounds,
         u_bounds=u_bounds,
         x_init=x_init,
         objective_functions=objective_functions,
-        ode_solver=ode_solver,
-        assume_phase_dynamics=assume_phase_dynamics,
+        ode_solver=ode_solver, # keep ?
+        assume_phase_dynamics=assume_phase_dynamics, # keep ?
     )
 
 

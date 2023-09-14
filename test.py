@@ -180,6 +180,7 @@ def prepare_ocp():
         interpolation=InterpolationType.LINEAR,
     )
 
+    # Taken from https://github.com/EveCharbie/AnthropoImpactOnTech/blob/main/TechOpt83.py
     vzinit = (
         9.81 / 2 * final_time
     )  # vitesse initiale en z du CoM pour revenir a terre au temps final
@@ -197,6 +198,11 @@ def prepare_ocp():
         [CoM_Q_sym],
         [bio_model[0].homogeneous_matrices_in_global(CoM_Q_sym, 0).to_mx()],
     )  # retourne la RT du bassin
+
+    r = (
+        np.array(CoM_Q_func(CoM_Q_init)).reshape(1, 3)
+        - np.array(bassin_Q_func(CoM_Q_init))[-1, :3]
+    )  # selectionne seulement la translation de la RT
 
     x_bounds["qdot"].min = [[tau_min] * n_q]
     x_bounds["qdot"].max = ([[tau_max] * n_q],)
