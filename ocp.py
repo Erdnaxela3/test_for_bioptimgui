@@ -88,16 +88,19 @@ def prepare_ocp(biorbd_model_path: str, final_time: float, n_shooting: int, ode_
     x_max = np.zeros((n_q + n_qdot, 3))
     x_min[:, 0] = [0, 0, 0, 0, 0, 0, -2.8, 2.8, -1, -1, 7, x[n_q + 3, 0], 0, x[n_q + 5, 0], 0, 0]
     x_max[:, 0] = [0, 0, 0, 0, 0, 0, -2.8, 2.8, 1, 1, 10, x[n_q + 3, 0], 0, x[n_q + 5, 0], 0, 0]
-    x_min[:, 1] = [
-        -1,
-        -1,
-        -0.001,
-        -0.001,
-        -np.pi / 4,
-        -np.pi,
-        -np.pi,
-        0,
-        -100,
+    x_min[:, 1] = [ # range of motion MAX
+        -1, # translation X
+        -1, # translation Y
+        -0.001, # translation Z, pour pas renter dans le sol
+        -0.001, # somersault, 
+        -np.pi / 4, # tilt, depasse jamais pi/4
+        -np.pi, # twist
+        0, # rotation Z [2pi/4; 5pi/4]
+        -np.pi, # elevation, rotation Y, bras g ou d [0, pi] ou [-pi, 0]
+        0, # elevation, autre bras (see 2 above), rotation Z
+        -np.pi, # elevation
+        # end Q
+        -100, # begin QDOT
         -100,
         -100,
         -100,
@@ -111,7 +114,7 @@ def prepare_ocp(biorbd_model_path: str, final_time: float, n_shooting: int, ode_
         -0.1,
         -0.1,
         -0.1,
-        2 * np.pi - 0.1,
+        2 * np.pi - 0.1, # 1 somersault, n_somersault * 2 * np.pi
         -15 * np.pi / 180,
         2 * np.pi,
         -np.pi,
@@ -149,8 +152,8 @@ def prepare_ocp(biorbd_model_path: str, final_time: float, n_shooting: int, ode_
     u_bounds = BoundsList()
     u_bounds.add([tau_min] * n_tau, [tau_max] * n_tau)
 
-    mapping = BiMappingList()
-    mapping.add("tau", [None, None, None, None, None, None, 0, 1], [6, 7])
+    mapping = BiMappingList() #TODO 
+    mapping.add("tau", [None, None, None, None, None, None, 0, 1, 2, 3], [6, 7, 8, 9])
 
     u_init = InitialGuessList()
     u_init.add([tau_init] * n_tau)
@@ -197,10 +200,10 @@ def prepare_ocp_quaternion(biorbd_model_path: str, final_time: float, n_shooting
     # --- Options --- #
     np.random.seed(0)
     biorbd_model = biorbd.Model(biorbd_model_path)
-    tau_min, tau_max, tau_init = -100, 100, 0
-    n_q = biorbd_model.nbQ()
+    tau_min, tau_max, tau_init = -100, 100, 0 # TODO keep
+    n_q = biorbd_model.nbQ() 
     n_qdot = biorbd_model.nbQdot()
-    n_tau = biorbd_model.nbGeneralizedTorque() - 6
+    n_tau = biorbd_model.nbGeneralizedTorque() # - biorbd.nbRoot() # TODO
 
     # Add objective functions
     objective_functions = ObjectiveList()
