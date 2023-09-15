@@ -21,6 +21,16 @@ from bioptim import (
 from casadi import MX, Function
 
 
+class SomersaultDirection:
+    FORWARD = "forward"
+    BACKWARD = "backward"
+
+
+class PreferredTwistSide:
+    RIGHT = "right"
+    LEFT = "left"
+
+
 def prepare_ocp():
     """
     This function build an optimal control program and instantiate it.
@@ -39,11 +49,16 @@ def prepare_ocp():
     bio_model = BiorbdModel(r"/home/aweng/afs/trampoOCP/models/AdCh.bioMod")
 
     n_shooting = 50
-    phase_time = 1.0  # TODO user-input to add
-    final_time = 3  # TO CHECK
+    phase_time = 1.5  # TODO user-input to add
+    final_time = 1.5  # TO CHECK
     n_somersault = 1
-    n_half_twist = 2
-    preferred_twist_side = "right"
+    n_half_twist = 1
+    preferred_twist_side = PreferredTwistSide.LEFT
+    somersault_direction = (
+        SomersaultDirection.BACKWARD
+        if n_half_twist % 2 == 0
+        else SomersaultDirection.FORWARD
+    )
 
     # Declaration of the constraints and objectives of the ocp
     constraints = ConstraintList()
@@ -54,6 +69,10 @@ def prepare_ocp():
         key="tau",
         node=Node.ALL_SHOOTING,
         weight=100,
+    )
+
+    objective_functions.add(
+        ObjectiveFcn.Mayer.MINIMIZE_TIME, min_bound=0.0, max_bound=final_time, weight=1
     )
 
     # Declaration of the dynamics function used during integration
@@ -67,8 +86,6 @@ def prepare_ocp():
     n_q = bio_model.nb_q
     n_qdot = bio_model.nb_qdot
     n_tau = bio_model.nb_tau - bio_model.nb_root
-
-    print(n_q, n_qdot, n_tau)
 
     # Declaration of optimization variables bounds and initial guesses
     # Path constraint
@@ -112,9 +129,17 @@ def prepare_ocp():
         -1,  # transX
         -1,  # transY
         -0.1,  # transZ
-        -0.2,  # somersault
+        (
+            -0.2
+            if somersault_direction == SomersaultDirection.FORWARD
+            else -(2 * np.pi * n_somersault + 0.2)
+        ),  # somersault
         -np.pi / 4,  # tilt
-        -0.2,  # twist
+        (
+            -0.2
+            if preferred_twist_side == PreferredTwistSide.RIGHT
+            else -(np.pi * n_half_twist + 0.2)
+        ),  # twist
         -0.65,  # right upper arm rotation Z
         -0.05,  # right upper arm rotation Y
         -2,  # left upper arm rotation Z
@@ -124,9 +149,17 @@ def prepare_ocp():
         1,  # transX
         1,  # transY
         10,  # transZ
-        2 * np.pi * n_somersault + 0.2,  # somersault
+        (
+            2 * np.pi * n_somersault + 0.2
+            if somersault_direction == SomersaultDirection.FORWARD
+            else 0.2
+        ),  # somersault
         np.pi / 4,  # tilt
-        np.pi * n_half_twist + 0.2,  # twist
+        (
+            np.pi * n_half_twist + 0.2
+            if preferred_twist_side == PreferredTwistSide.RIGHT
+            else 0.2
+        ),  # twist
         2,  # right upper arm rotation Z
         3,  # right upper arm rotation Y
         0.65,  # left upper arm rotation Z
@@ -138,9 +171,17 @@ def prepare_ocp():
         -1,  # transX
         -1,  # transY
         -0.1,  # transZ
-        2 * np.pi * n_somersault - 0.1,  # somersault
+        (
+            2 * np.pi * n_somersault - 0.1
+            if somersault_direction == SomersaultDirection.FORWARD
+            else -2 * np.pi * n_somersault - 0.1
+        ),  # somersault
         -0.1,  # tilt
-        np.pi * n_half_twist - 0.1,  # twist
+        (
+            np.pi * n_half_twist - 0.1
+            if preferred_twist_side == PreferredTwistSide.RIGHT
+            else -np.pi * n_half_twist - 0.1
+        ),  # twist
         -0.1,  # right upper arm rotation Z
         2.9 - 0.1,  # right upper arm rotation Y
         -0.1,  # left upper arm rotation Z
@@ -150,9 +191,17 @@ def prepare_ocp():
         1,  # transX
         1,  # transY
         0.1,  # transZ
-        2 * np.pi * n_somersault + 0.1,  # somersault
+        (
+            2 * np.pi * n_somersault + 0.1
+            if somersault_direction == SomersaultDirection.FORWARD
+            else -2 * np.pi * n_somersault + 0.1
+        ),  # somersault
         0.1,  # tilt
-        np.pi * n_half_twist + 0.1,  # twist
+        (
+            np.pi * n_half_twist + 0.1
+            if preferred_twist_side == PreferredTwistSide.RIGHT
+            else -np.pi * n_half_twist + 0.1
+        ),  # twist
         0.1,  # right upper arm rotation Z
         2.9 + 0.1,  # right upper arm rotation Y
         0.1,  # left upper arm rotation Z
@@ -166,9 +215,17 @@ def prepare_ocp():
                 0,
                 0,
                 0,
-                2 * np.pi * n_somersault,
+                (
+                    2 * np.pi * n_somersault
+                    if somersault_direction == SomersaultDirection.FORWARD
+                    else -2 * np.pi * n_somersault
+                ),  # somersault
                 0,
-                np.pi * n_half_twist,
+                (
+                    np.pi * n_half_twist
+                    if preferred_twist_side == PreferredTwistSide.RIGHT
+                    else -np.pi * n_half_twist
+                ),  # twist
                 0,
                 2.9,
                 0,
@@ -205,9 +262,6 @@ def prepare_ocp():
         np.array(co_m_q_func(co_m_q_init)).reshape(1, 3)
         - np.array(bassin_q_func(co_m_q_init))[-1, :3]
     )  # selectionne seulement la translation de la RT
-
-    # x_bounds["qdot"].min[:, :] = np.array([[tau_min] * n_qdot])
-    # x_bounds["qdot"].max[:, :] = np.array([[tau_max] * n_qdot])
 
     x_bounds["qdot"].min[:, 0] = [
         -0.5,  # pelvis translation X
@@ -339,7 +393,7 @@ def main():
 
     # --- Solve the ocp --- #
     sol = ocp.solve(solver=Solver.IPOPT())
-    sol.graphs(show_bounds=True)  # FOR CHECK PURPOSE
+    # sol.graphs(show_bounds=True)
     sol.animate()
 
 
