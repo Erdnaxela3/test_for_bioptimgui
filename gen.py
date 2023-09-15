@@ -66,7 +66,7 @@ def prepare_ocp():
 
     n_q = bio_model.nb_q
     n_qdot = bio_model.nb_qdot
-    n_tau = bio_model.nb_tau
+    n_tau = bio_model.nb_tau - bio_model.nb_root
 
     print(n_q, n_qdot, n_tau)
 
