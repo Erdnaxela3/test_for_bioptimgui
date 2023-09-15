@@ -68,6 +68,8 @@ def prepare_ocp():
     n_qdot = bio_model.nb_qdot
     n_tau = bio_model.nb_tau
 
+    print(n_q, n_qdot, n_tau)
+
     # Declaration of optimization variables bounds and initial guesses
     # Path constraint
     x_bounds = BoundsList()
@@ -186,26 +188,103 @@ def prepare_ocp():
     )  # vitesse initiale en z du CoM pour revenir a terre au temps final
 
     # decalage entre le bassin et le CoM
-    CoM_Q_sym = MX.sym("CoM", n_q)
-    CoM_Q_init = x_bounds[0].min[
+    co_m_q_sym = MX.sym("CoM", n_q)
+    co_m_q_init = x_bounds["q"].min[
         :n_q, 0
     ]  # min ou max ne change rien a priori, au DEBUT ils sont egaux normalement
-    CoM_Q_func = Function(
-        "CoM_Q_func", [CoM_Q_sym], [bio_model[0].center_of_mass(CoM_Q_sym)]
+    co_m_q_func = Function(
+        "co_m_q_func", [co_m_q_sym], [bio_model.center_of_mass(co_m_q_sym)]
     )
-    bassin_Q_func = Function(
-        "bassin_Q_func",
-        [CoM_Q_sym],
-        [bio_model[0].homogeneous_matrices_in_global(CoM_Q_sym, 0).to_mx()],
+    bassin_q_func = Function(
+        "bassin_q_func",
+        [co_m_q_sym],
+        [bio_model.homogeneous_matrices_in_global(co_m_q_sym, 0).to_mx()],
     )  # retourne la RT du bassin
 
     r = (
-        np.array(CoM_Q_func(CoM_Q_init)).reshape(1, 3)
-        - np.array(bassin_Q_func(CoM_Q_init))[-1, :3]
+        np.array(co_m_q_func(co_m_q_init)).reshape(1, 3)
+        - np.array(bassin_q_func(co_m_q_init))[-1, :3]
     )  # selectionne seulement la translation de la RT
 
-    x_bounds["qdot"].min = [[tau_min] * n_q]
-    x_bounds["qdot"].max = ([[tau_max] * n_q],)
+    # x_bounds["qdot"].min[:, :] = np.array([[tau_min] * n_qdot])
+    # x_bounds["qdot"].max[:, :] = np.array([[tau_max] * n_qdot])
+
+    x_bounds["qdot"].min[:, 0] = [
+        -0.5,  # pelvis translation X
+        -0.5,  # pelvis translation Y
+        -vzinit - 0.5,  # pelvis translation Z
+        0.5,  # pelvis rotation X, somersault
+        0,  # pelvis rotation Y, tilt
+        0,  # pelvis rotation Z, twist
+        0,  # right upper arm rotation Z
+        0,  # right upper arm rotation Y
+        0,  # left upper arm rotation Z
+        0,  # left upper arm rotation Y
+    ]
+    x_bounds["qdot"].max[:, 0] = [
+        0.5,  # pelvis translation X
+        0.5,  # pelvis translation Y
+        vzinit + 0.5,  # pelvis translation Z
+        20,  # pelvis rotation X, somersault
+        0,  # pelvis rotation Y, tilt
+        0,  # pelvis rotation Z, twist
+        0,  # right upper arm rotation Z
+        0,  # right upper arm rotation Y
+        0,  # left upper arm rotation Z
+        0,  # left upper arm rotation Y
+    ]
+
+    # Intermediate bounds
+    x_bounds["qdot"].min[:, 1] = [
+        -10,
+        -10,
+        tau_min,
+        0.5,
+        tau_min,
+        tau_min,
+        tau_min,
+        tau_min,
+        tau_min,
+        tau_min,
+    ]
+    x_bounds["qdot"].max[:, 1] = [
+        10,
+        10,
+        tau_max,
+        20,
+        tau_max,
+        tau_max,
+        tau_max,
+        tau_max,
+        tau_max,
+        tau_max,
+    ]
+
+    # Final bounds
+    x_bounds["qdot"].min[:, 2] = [
+        -10,
+        -10,
+        tau_min,
+        0.5,
+        tau_min,
+        tau_min,
+        tau_min,
+        tau_min,
+        tau_min,
+        tau_min,
+    ]
+    x_bounds["qdot"].max[:, 2] = [
+        10,
+        10,
+        tau_max,
+        20,
+        tau_max,
+        tau_max,
+        tau_max,
+        tau_max,
+        tau_max,
+        tau_max,
+    ]
 
     x_initial_guesses.add(
         "qdot",
@@ -225,7 +304,6 @@ def prepare_ocp():
         interpolation=InterpolationType.CONSTANT,
     )
 
-    # TOCHECK
     mapping = BiMappingList()
     mapping.add(
         "tau",
