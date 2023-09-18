@@ -2,6 +2,8 @@
 This file was automatically generated using BioptimGUI version 0.0.1
 """
 
+import pickle as pkl
+
 import numpy as np
 from bioptim import (
     BiorbdModel,
@@ -46,11 +48,11 @@ def prepare_ocp():
     # Declaration of generic elements
     bio_model = BiorbdModel(r"/home/aweng/afs/trampoOCP/models/AdCh.bioMod")
 
-    n_shooting = 50
+    n_shooting = 150
     phase_time = 1.5  # TODO user-input to add
     final_time = 1.5  # TO CHECK
     n_somersault = 1
-    n_half_twist = 1
+    n_half_twist = 0
     preferred_twist_side = PreferredTwistSide.LEFT
     somersault_direction = (
         SomersaultDirection.BACKWARD
@@ -290,24 +292,24 @@ def prepare_ocp():
         0,  # left upper arm rotation Y
     ]
 
-    # borne_inf = (x_bounds["q"].min[0:3, 0] + np.cross(r, x_bounds["qdot"].min[6:9, 0]))[
-    #     0
-    # ]
-    # borne_sup = (x_bounds["q"].min[0:3, 0] + np.cross(r, x_bounds["qdot"].max[6:9, 0]))[
-    #     0
-    # ]
-    #
-    # x_bounds["qdot"].min[0:3, 0] = (
-    #     min(borne_sup[0], borne_inf[0]),
-    #     min(borne_sup[1], borne_inf[1]),
-    #     min(borne_sup[2], borne_inf[2]),
-    # )
-    #
-    # x_bounds["qdot"].max[0:3, 0] = (
-    #     max(borne_sup[0], borne_inf[0]),
-    #     max(borne_sup[1], borne_inf[1]),
-    #     max(borne_sup[2], borne_inf[2]),
-    # )
+    borne_inf = (x_bounds["q"].min[0:3, 0] + np.cross(r, x_bounds["qdot"].min[3:6, 0]))[
+        0
+    ]
+    borne_sup = (x_bounds["q"].min[0:3, 0] + np.cross(r, x_bounds["qdot"].max[3:6, 0]))[
+        0
+    ]
+
+    x_bounds["qdot"].min[0:3, 0] = (
+        min(borne_sup[0], borne_inf[0]),
+        min(borne_sup[1], borne_inf[1]),
+        min(borne_sup[2], borne_inf[2]),
+    )
+
+    x_bounds["qdot"].max[0:3, 0] = (
+        max(borne_sup[0], borne_inf[0]),
+        max(borne_sup[1], borne_inf[1]),
+        max(borne_sup[2], borne_inf[2]),
+    )
 
     # Intermediate bounds
     x_bounds["qdot"].min[:, 1] = [
@@ -412,10 +414,25 @@ def main():
     # --- Prepare the ocp --- #
     ocp = prepare_ocp()
 
+    solver = Solver.IPOPT()
+    solver.set_maximum_iterations(0)
     # --- Solve the ocp --- #
-    sol = ocp.solve(solver=Solver.IPOPT())
+    sol = ocp.solve(solver=solver)
     # sol.graphs(show_bounds=True)
     sol.animate()
+
+    out = sol.integrate(merge_phases=True)
+    state, time_vector = out._states["unscaled"], out._time_vector
+
+    save = {
+        "solution": sol,
+        "unscaled_state": state,
+        "time_vector": time_vector,
+    }
+
+    del sol.ocp
+    with open(f"somersault.pkl", "wb") as f:
+        pkl.dump(save, f)
 
 
 if __name__ == "__main__":
