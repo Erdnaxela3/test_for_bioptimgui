@@ -21,16 +21,6 @@ from bioptim import (
 from casadi import MX, Function
 
 
-class SomersaultDirection:
-    FORWARD = "forward"
-    BACKWARD = "backward"
-
-
-class PreferredTwistSide:
-    RIGHT = "right"
-    LEFT = "left"
-
-
 def prepare_ocp():
     """
     This function build an optimal control program and instantiate it.
@@ -44,6 +34,14 @@ def prepare_ocp():
     -------
     The OptimalControlProgram ready to be solved
     """
+
+    class SomersaultDirection:
+        FORWARD = "forward"
+        BACKWARD = "backward"
+
+    class PreferredTwistSide:
+        RIGHT = "right"
+        LEFT = "left"
 
     # Declaration of generic elements
     bio_model = BiorbdModel(r"/home/aweng/afs/trampoOCP/models/AdCh.bioMod")
@@ -137,7 +135,7 @@ def prepare_ocp():
         -np.pi / 4,  # tilt
         (
             -0.2
-            if preferred_twist_side == PreferredTwistSide.RIGHT
+            if preferred_twist_side == PreferredTwistSide.LEFT
             else -(np.pi * n_half_twist + 0.2)
         ),  # twist
         -0.65,  # right upper arm rotation Z
@@ -157,7 +155,7 @@ def prepare_ocp():
         np.pi / 4,  # tilt
         (
             np.pi * n_half_twist + 0.2
-            if preferred_twist_side == PreferredTwistSide.RIGHT
+            if preferred_twist_side == PreferredTwistSide.LEFT
             else 0.2
         ),  # twist
         2,  # right upper arm rotation Z
@@ -179,7 +177,7 @@ def prepare_ocp():
         -0.1,  # tilt
         (
             np.pi * n_half_twist - 0.1
-            if preferred_twist_side == PreferredTwistSide.RIGHT
+            if preferred_twist_side == PreferredTwistSide.LEFT
             else -np.pi * n_half_twist - 0.1
         ),  # twist
         -0.1,  # right upper arm rotation Z
@@ -199,7 +197,7 @@ def prepare_ocp():
         0.1,  # tilt
         (
             np.pi * n_half_twist + 0.1
-            if preferred_twist_side == PreferredTwistSide.RIGHT
+            if preferred_twist_side == PreferredTwistSide.LEFT
             else -np.pi * n_half_twist + 0.1
         ),  # twist
         0.1,  # right upper arm rotation Z
@@ -223,7 +221,7 @@ def prepare_ocp():
                 0,
                 (
                     np.pi * n_half_twist
-                    if preferred_twist_side == PreferredTwistSide.RIGHT
+                    if preferred_twist_side == PreferredTwistSide.LEFT
                     else -np.pi * n_half_twist
                 ),  # twist
                 0,
@@ -264,10 +262,12 @@ def prepare_ocp():
     )  # selectionne seulement la translation de la RT
 
     x_bounds["qdot"].min[:, 0] = [
-        -0.5,  # pelvis translation X
+        -0.5,  # pelvis translation X speed
         -0.5,  # pelvis translation Y
         -vzinit - 0.5,  # pelvis translation Z
-        0.5,  # pelvis rotation X, somersault
+        (
+            0.5 if somersault_direction == SomersaultDirection.FORWARD else -20
+        ),  # pelvis rotation X, somersault
         0,  # pelvis rotation Y, tilt
         0,  # pelvis rotation Z, twist
         0,  # right upper arm rotation Z
@@ -279,7 +279,9 @@ def prepare_ocp():
         0.5,  # pelvis translation X
         0.5,  # pelvis translation Y
         vzinit + 0.5,  # pelvis translation Z
-        20,  # pelvis rotation X, somersault
+        (
+            20 if somersault_direction == SomersaultDirection.FORWARD else -0.5
+        ),  # pelvis rotation X, somersault
         0,  # pelvis rotation Y, tilt
         0,  # pelvis rotation Z, twist
         0,  # right upper arm rotation Z
@@ -288,56 +290,75 @@ def prepare_ocp():
         0,  # left upper arm rotation Y
     ]
 
+    # borne_inf = (x_bounds["q"].min[0:3, 0] + np.cross(r, x_bounds["qdot"].min[6:9, 0]))[
+    #     0
+    # ]
+    # borne_sup = (x_bounds["q"].min[0:3, 0] + np.cross(r, x_bounds["qdot"].max[6:9, 0]))[
+    #     0
+    # ]
+    #
+    # x_bounds["qdot"].min[0:3, 0] = (
+    #     min(borne_sup[0], borne_inf[0]),
+    #     min(borne_sup[1], borne_inf[1]),
+    #     min(borne_sup[2], borne_inf[2]),
+    # )
+    #
+    # x_bounds["qdot"].max[0:3, 0] = (
+    #     max(borne_sup[0], borne_inf[0]),
+    #     max(borne_sup[1], borne_inf[1]),
+    #     max(borne_sup[2], borne_inf[2]),
+    # )
+
     # Intermediate bounds
     x_bounds["qdot"].min[:, 1] = [
         -10,
         -10,
-        tau_min,
-        0.5,
-        tau_min,
-        tau_min,
-        tau_min,
-        tau_min,
-        tau_min,
-        tau_min,
+        -100,
+        (0.5 if somersault_direction == SomersaultDirection.FORWARD else -20),
+        -100,
+        -100,
+        -100,
+        -100,
+        -100,
+        -100,
     ]
     x_bounds["qdot"].max[:, 1] = [
         10,
         10,
-        tau_max,
-        20,
-        tau_max,
-        tau_max,
-        tau_max,
-        tau_max,
-        tau_max,
-        tau_max,
+        100,
+        (20 if somersault_direction == SomersaultDirection.FORWARD else -0.5),
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
     ]
 
     # Final bounds
     x_bounds["qdot"].min[:, 2] = [
         -10,
         -10,
-        tau_min,
-        0.5,
-        tau_min,
-        tau_min,
-        tau_min,
-        tau_min,
-        tau_min,
-        tau_min,
+        -100,
+        (0.5 if somersault_direction == SomersaultDirection.FORWARD else -20),
+        -100,
+        -100,
+        -100,
+        -100,
+        -100,
+        -100,
     ]
     x_bounds["qdot"].max[:, 2] = [
         10,
         10,
-        tau_max,
-        20,
-        tau_max,
-        tau_max,
-        tau_max,
-        tau_max,
-        tau_max,
-        tau_max,
+        100,
+        (20 if somersault_direction == SomersaultDirection.FORWARD else -0.5),
+        100,
+        100,
+        100,
+        100,
+        100,
+        100,
     ]
 
     x_initial_guesses.add(
