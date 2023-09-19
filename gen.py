@@ -48,7 +48,7 @@ def prepare_ocp():
     # Declaration of generic elements
     bio_model = BiorbdModel(r"/home/aweng/afs/trampoOCP/models/AdCh.bioMod")
 
-    n_shooting = 150
+    n_shooting = 24
     phase_time = 1.5  # TODO user-input to add
     final_time = 1.5  # TO CHECK
     n_somersault = 1
@@ -292,12 +292,20 @@ def prepare_ocp():
         0,  # left upper arm rotation Y
     ]
 
-    borne_inf = (x_bounds["q"].min[0:3, 0] + np.cross(r, x_bounds["qdot"].min[3:6, 0]))[
-        0
-    ]
-    borne_sup = (x_bounds["q"].min[0:3, 0] + np.cross(r, x_bounds["qdot"].max[3:6, 0]))[
-        0
-    ]
+    if somersault_direction == SomersaultDirection.FORWARD :
+        borne_inf = (x_bounds["q"].min[0:3, 0] + np.cross(r, x_bounds["qdot"].min[3:6, 0]))[
+            0
+        ]
+        borne_sup = (x_bounds["q"].min[0:3, 0] + np.cross(r, x_bounds["qdot"].max[3:6, 0]))[
+            0
+        ]
+    else:
+        borne_inf = (x_bounds["q"].min[0:3, 0] - np.cross(r, x_bounds["qdot"].min[3:6, 0]))[
+            0
+        ]
+        borne_sup = (x_bounds["q"].min[0:3, 0] - np.cross(r, x_bounds["qdot"].max[3:6, 0]))[
+            0
+        ]
 
     x_bounds["qdot"].min[0:3, 0] = (
         min(borne_sup[0], borne_inf[0]),
@@ -415,7 +423,7 @@ def main():
     ocp = prepare_ocp()
 
     solver = Solver.IPOPT()
-    solver.set_maximum_iterations(0)
+    # solver.set_maximum_iterations(0) # debug purpose
     # --- Solve the ocp --- #
     sol = ocp.solve(solver=solver)
     # sol.graphs(show_bounds=True)
