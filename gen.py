@@ -49,8 +49,9 @@ def prepare_ocp():
     bio_model = BiorbdModel(r"/home/aweng/afs/trampoOCP/models/AdCh.bioMod")
 
     n_shooting = 24
-    phase_time = 1.5  # TODO user-input to add
-    final_time = 1.5  # TO CHECK
+    phase_time = 1.5  # TODO
+    final_time = 1.5  # TODO add to UI
+    final_time_margin = 0.1 # TODO add to UI
     n_somersault = 1
     n_half_twist = 0
     preferred_twist_side = PreferredTwistSide.LEFT
@@ -72,7 +73,7 @@ def prepare_ocp():
     )
 
     objective_functions.add(
-        ObjectiveFcn.Mayer.MINIMIZE_TIME, min_bound=0.0, max_bound=final_time, weight=1
+        ObjectiveFcn.Mayer.MINIMIZE_TIME, min_bound=final_time - final_time_margin, max_bound=final_time + final_time_margin, weight=1
     )
 
     # Declaration of the dynamics function used during integration
@@ -100,8 +101,8 @@ def prepare_ocp():
 
     # Initial bounds
     x_bounds["q"].min[:, 0] = [
-        -1,  # pelvis translation X
-        -1,  # pelvis translation Y
+        -0.001,  # pelvis translation X
+        -0.001,  # pelvis translation Y
         -0.001,  # pelvis translation Z
         0,  # pelvis rotation X, somersault
         0,  # pelvis rotation Y, tilt
@@ -112,8 +113,8 @@ def prepare_ocp():
         -2.9,  # left upper arm rotation Y
     ]
     x_bounds["q"].max[:, 0] = [
-        1,  # pelvis translation X
-        1,  # pelvis translation Y
+        0.001,  # pelvis translation X
+        0.001,  # pelvis translation Y
         0.001,  # pelvis translation Z
         0,  # pelvis rotation X, somersault
         0,  # pelvis rotation Y, tilt
@@ -244,29 +245,11 @@ def prepare_ocp():
         9.81 / 2 * final_time
     )  # vitesse initiale en z du CoM pour revenir a terre au temps final
 
-    # decalage entre le bassin et le CoM
-    co_m_q_sym = MX.sym("CoM", n_q)
-    co_m_q_init = x_bounds["q"].min[
-        :n_q, 0
-    ]  # min ou max ne change rien a priori, au DEBUT ils sont egaux normalement
-    co_m_q_func = Function(
-        "co_m_q_func", [co_m_q_sym], [bio_model.center_of_mass(co_m_q_sym)]
-    )
-    bassin_q_func = Function(
-        "bassin_q_func",
-        [co_m_q_sym],
-        [bio_model.homogeneous_matrices_in_global(co_m_q_sym, 0).to_mx()],
-    )  # retourne la RT du bassin
-
-    r = (
-        np.array(co_m_q_func(co_m_q_init)).reshape(1, 3)
-        - np.array(bassin_q_func(co_m_q_init))[-1, :3]
-    )  # selectionne seulement la translation de la RT
 
     x_bounds["qdot"].min[:, 0] = [
         -0.5,  # pelvis translation X speed
         -0.5,  # pelvis translation Y
-        -vzinit - 0.5,  # pelvis translation Z
+        vzinit - 2,  # pelvis translation Z
         (
             0.5 if somersault_direction == SomersaultDirection.FORWARD else -20
         ),  # pelvis rotation X, somersault
@@ -280,7 +263,7 @@ def prepare_ocp():
     x_bounds["qdot"].max[:, 0] = [
         0.5,  # pelvis translation X
         0.5,  # pelvis translation Y
-        vzinit + 0.5,  # pelvis translation Z
+        vzinit + 2,  # pelvis translation Z
         (
             20 if somersault_direction == SomersaultDirection.FORWARD else -0.5
         ),  # pelvis rotation X, somersault
@@ -292,32 +275,6 @@ def prepare_ocp():
         0,  # left upper arm rotation Y
     ]
 
-    if somersault_direction == SomersaultDirection.FORWARD :
-        borne_inf = (x_bounds["q"].min[0:3, 0] + np.cross(r, x_bounds["qdot"].min[3:6, 0]))[
-            0
-        ]
-        borne_sup = (x_bounds["q"].min[0:3, 0] + np.cross(r, x_bounds["qdot"].max[3:6, 0]))[
-            0
-        ]
-    else:
-        borne_inf = (x_bounds["q"].min[0:3, 0] - np.cross(r, x_bounds["qdot"].min[3:6, 0]))[
-            0
-        ]
-        borne_sup = (x_bounds["q"].min[0:3, 0] - np.cross(r, x_bounds["qdot"].max[3:6, 0]))[
-            0
-        ]
-
-    x_bounds["qdot"].min[0:3, 0] = (
-        min(borne_sup[0], borne_inf[0]),
-        min(borne_sup[1], borne_inf[1]),
-        min(borne_sup[2], borne_inf[2]),
-    )
-
-    x_bounds["qdot"].max[0:3, 0] = (
-        max(borne_sup[0], borne_inf[0]),
-        max(borne_sup[1], borne_inf[1]),
-        max(borne_sup[2], borne_inf[2]),
-    )
 
     # Intermediate bounds
     x_bounds["qdot"].min[:, 1] = [
@@ -426,7 +383,7 @@ def main():
     # solver.set_maximum_iterations(0) # debug purpose
     # --- Solve the ocp --- #
     sol = ocp.solve(solver=solver)
-    # sol.graphs(show_bounds=True)
+    # sol.graphs(show_bounds=True) # debug purpose
     sol.animate()
 
     out = sol.integrate(merge_phases=True)
