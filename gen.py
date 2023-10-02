@@ -2,8 +2,6 @@
 This file was automatically generated using BioptimGUI version 0.0.1
 """
 
-import pickle as pkl
-
 import numpy as np
 from bioptim import (
     BiorbdModel,
@@ -45,26 +43,11 @@ def prepare_ocp():
         LEFT = "left"
 
     # Declaration of generic elements
-    n_shooting = (
-        24,
-        24,
-        24,
-        24,
-    )
-    phase_time = (  # time of each phase
-        0.75,
-        0.75,
-        0.75,
-        0.75,
-    )
+    n_shooting = [12]
+    phase_time = [1.0]
     final_time_margin = 0.1
-    n_somersault = 4
-    n_half_twist = (
-        2,
-        0,
-        1,
-        6,
-    )
+    n_somersault = 1
+    n_half_twist = [0]
     preferred_twist_side = PreferredTwistSide.LEFT
     somersault_direction = (
         SomersaultDirection.BACKWARD
@@ -72,32 +55,25 @@ def prepare_ocp():
         else SomersaultDirection.FORWARD
     )
 
-    bio_model = [
-        BiorbdModel(r"/home/aweng/afs/trampoOCP/models/AdCh.bioMod")
-        for _ in range(n_somersault)
-    ]  # can't use * to have multiple, needs duplication
+    bio_model = [BiorbdModel(r"models/AdChfull.bioMod") for _ in range(n_somersault)]
+    # can't use * to have multiple, needs duplication
 
-    # Declaration of the objectives of the ocp
-    constraints = ConstraintList()  # keep empty for now
-
+    # Declaration of the constraints and objectives of the ocp
+    constraints = ConstraintList()
     objective_functions = ObjectiveList()
-
-    for phase in range(n_somersault):
-        objective_functions.add(
-            ObjectiveFcn.Lagrange.MINIMIZE_CONTROL,
-            key="tau",
-            node=Node.ALL_SHOOTING,
-            weight=100,
-            phase=phase,
-        )
-
-        objective_functions.add(
-            ObjectiveFcn.Mayer.MINIMIZE_TIME,
-            min_bound=phase_time[phase] - final_time_margin,  # use current phase
-            max_bound=phase_time[phase] + final_time_margin,
-            weight=1,
-            phase=phase,
-        )
+    objective_functions.add(
+        objective=ObjectiveFcn.Lagrange.MINIMIZE_CONTROL,
+        key="tau",
+        node=Node.ALL_SHOOTING,
+        weight=100.0,
+    )
+    objective_functions.add(
+        objective=ObjectiveFcn.Mayer.MINIMIZE_TIME,
+        min_bound=0.9,
+        max_bound=1.1,
+        node=Node.END,
+        weight=1.0,
+    )
 
     # Declaration of the dynamics function used during integration
     dynamics = DynamicsList()
@@ -105,7 +81,7 @@ def prepare_ocp():
     for phase in range(n_somersault):
         dynamics.add(
             DynamicsFcn.TORQUE_DRIVEN,
-            expand=True,  # TODO test with/without expand
+            expand=True,
             phase=phase,  # don't need it, but keep it for clarity
         )
 
@@ -134,8 +110,14 @@ def prepare_ocp():
         0,  # pelvis rotation Z, twist
         0,  # right upper arm rotation Z
         2.9,  # right upper arm rotation Y
+        0,  # right forearm rotation Z
+        0,  # right forearm arm rotation X
         0,  # left upper arm rotation Z
         -2.9,  # left upper arm rotation Y
+        0,  # left forearm rotation Z
+        0,  # left forearm arm rotation X
+        0,  # thigh rotation X
+        0,  # thigh rotation Y
     ]
     x_bounds[0]["q"].max[:, 0] = [
         0.001,  # pelvis translation X
@@ -146,8 +128,14 @@ def prepare_ocp():
         0,  # pelvis rotation Z, twist
         0,  # right upper arm rotation Z
         2.9,  # right upper arm rotation Y
+        0,  # right forearm rotation Z
+        0,  # right forearm arm rotation X
         0,  # left upper arm rotation Z
         -2.9,  # left upper arm rotation Y
+        0,  # left forearm rotation Z
+        0,  # left forearm arm rotation X
+        0,  # thigh rotation X
+        0,  # thigh rotation Y
     ]
 
     for phase in range(n_somersault):
@@ -174,8 +162,14 @@ def prepare_ocp():
             ),  # twist
             -0.65,  # right upper arm rotation Z
             -0.05,  # right upper arm rotation Y
+            -1.8,  # right forearm rotation Z
+            -2.65,  # right forearm arm rotation X
             -2,  # left upper arm rotation Z
             -3,  # left upper arm rotation Y
+            1.1,  # left forearm rotation Z
+            -2.65,  # left forearm arm rotation X
+            -2.7,  # thigh rotation X
+            -0.1,  # thigh rotation Y
         ]
         x_bounds[phase]["q"].max[:, 1] = [
             1,  # transX
@@ -194,8 +188,14 @@ def prepare_ocp():
             ),  # twist
             2,  # right upper arm rotation Z
             3,  # right upper arm rotation Y
+            1.1,  # right forearm rotation Z
+            0,  # right forearm arm rotation X
             0.65,  # left upper arm rotation Z
             0.05,  # left upper arm rotation Y
+            1.8,  # left forearm rotation Z
+            0,  # left forearm arm rotation X
+            0.3,  # thigh rotation X
+            0.1,  # thigh rotation Y
         ]
 
         # Final bounds, used for next phase initial bounds
@@ -216,8 +216,14 @@ def prepare_ocp():
             ),  # twist
             -0.65,  # right upper arm rotation Z
             -0.05,  # right upper arm rotation Y
+            -1.8,  # right forearm rotation Z
+            -2.65,  # right forearm arm rotation X
             -2,  # left upper arm rotation Z
             -3,  # left upper arm rotation Y
+            1.1,  # left forearm rotation Z
+            -2.65,  # left forearm arm rotation X
+            -2.7,  # thigh rotation X
+            -0.1,  # thigh rotation Y
         ]
         x_bounds[phase]["q"].max[:, 2] = [
             1,  # transX
@@ -236,8 +242,14 @@ def prepare_ocp():
             ),  # twist
             2,  # right upper arm rotation Z
             3,  # right upper arm rotation Y
+            1.1,  # right forearm rotation Z
+            0,  # right forearm arm rotation X
             0.65,  # left upper arm rotation Z
             0.05,  # left upper arm rotation Y
+            1.8,  # left forearm rotation Z
+            0,  # left forearm arm rotation X
+            0.3,  # thigh rotation X
+            0.1,  # thigh rotation Y
         ]
 
     # Final and last bounds
@@ -258,8 +270,14 @@ def prepare_ocp():
         ),  # twist
         -0.1,  # right upper arm rotation Z
         2.9 - 0.1,  # right upper arm rotation Y
+        -0.1,  # right forearm rotation Z
+        -0.1,  # right forearm rotation X
         -0.1,  # left upper arm rotation Z
         -2.9 - 0.1,  # left upper arm rotation Y
+        -0.1,  # left forearm rotation Z
+        -0.1,  # left forearm rotation X
+        -0.1,  # thigh rotation X
+        -0.1,  # thigh rotation Y
     ]
     x_bounds[n_somersault - 1]["q"].max[:, 2] = [
         1,  # transX
@@ -278,15 +296,21 @@ def prepare_ocp():
         ),  # twist
         0.1,  # right upper arm rotation Z
         2.9 + 0.1,  # right upper arm rotation Y
+        0.1,  # right forearm rotation Z
+        0.1,  # right forearm rotation X
         0.1,  # left upper arm rotation Z
         -2.9 + 0.1,  # left upper arm rotation Y
+        0.1,  # left forearm rotation Z
+        0.1,  # left forearm rotation X
+        0.1,  # thigh rotation X
+        0.1,  # thigh rotation Y
     ]
 
     x_initial_guesses = InitialGuessList()
 
     x_inits = np.zeros((n_somersault, 2, n_q))
 
-    x_inits[0] = np.array([0, 0, 0, 0, 0, 0, 0, 2.9, 0, -2.9])
+    x_inits[0] = np.array([0, 0, 0, 0, 0, 0, 0, 2.9, 0, 0, 0, -2.9, 0, 0, 0, 0])
 
     for phase in range(n_somersault):
         if phase != 0:
@@ -311,7 +335,13 @@ def prepare_ocp():
                 0,
                 2.9,
                 0,
+                0,
+                0,
                 -2.9,
+                0,
+                0,
+                0,
+                0,
             ]
         )
 
@@ -339,8 +369,14 @@ def prepare_ocp():
         0,  # pelvis rotation Z, twist
         0,  # right upper arm rotation Z
         0,  # right upper arm rotation Y
+        0,  # right forearm rotation Z
+        0,  # right forearm rotation X
         0,  # left upper arm rotation Z
         0,  # left upper arm rotation Y
+        0,  # left forearm rotation Z
+        0,  # left forearm rotation X
+        0,  # thigh rotation X
+        0,  # thigh rotation Y
     ]
     x_bounds[0]["qdot"].max[:, 0] = [
         0.5,  # pelvis translation X
@@ -353,8 +389,14 @@ def prepare_ocp():
         0,  # pelvis rotation Z, twist
         0,  # right upper arm rotation Z
         0,  # right upper arm rotation Y
+        0,  # right forearm rotation Z
+        0,  # right forearm rotation X
         0,  # left upper arm rotation Z
         0,  # left upper arm rotation Y
+        0,  # left forearm rotation Z
+        0,  # left forearm rotation X
+        0,  # thigh rotation X
+        0,  # thigh rotation Y
     ]
 
     for phase in range(n_somersault):
@@ -375,12 +417,24 @@ def prepare_ocp():
             -100,
             -100,
             -100,
+            -100,
+            -100,
+            -100,
+            -100,
+            -100,
+            -100,
         ]
         x_bounds[phase]["qdot"].max[:, 1] = [
             10,
             10,
             100,
             (20 if somersault_direction == SomersaultDirection.FORWARD else -0.5),
+            100,
+            100,
+            100,
+            100,
+            100,
+            100,
             100,
             100,
             100,
@@ -416,14 +470,13 @@ def prepare_ocp():
         "tau",
         initial_guess=[tau_init] * n_tau,
         interpolation=InterpolationType.CONSTANT,
-        # TODO check default behavior
     )
 
     mapping = BiMappingList()
     mapping.add(
         "tau",
-        to_second=[None, None, None, None, None, None, 0, 1, 2, 3],
-        to_first=[6, 7, 8, 9],
+        to_second=[None, None, None, None, None, None, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+        to_first=[6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
     )
 
     # Construct and return the optimal control program (OCP)
@@ -454,24 +507,24 @@ def main():
 
     # solver = Solver.IPOPT(show_online_optim=True, show_options={"show_bounds": True}) # debug purpose
     solver = Solver.IPOPT()
-    # solver.set_maximum_iterations(0) # debug purpose
+    # solver.set_maximum_iterations(1000)  # debug purpose
     # --- Solve the ocp --- #
     sol = ocp.solve(solver=solver)
-    # sol.graphs(show_bounds=True)  # debug purpose
+    sol.graphs(show_bounds=True)  # debug purpose
     sol.animate()
 
-    out = sol.integrate(merge_phases=True)
-    state, time_vector = out._states["unscaled"], out._time_vector
-
-    save = {
-        "solution": sol,
-        "unscaled_state": state,
-        "time_vector": time_vector,
-    }
-
-    del sol.ocp
-    with open(f"somersault.pkl", "wb") as f:
-        pkl.dump(save, f)
+    # out = sol.integrate(merge_phases=True)
+    # state, time_vector = out._states["unscaled"], out._time_vector
+    #
+    # save = {
+    #     "solution": sol,
+    #     "unscaled_state": state,
+    #     "time_vector": time_vector,
+    # }
+    #
+    # del sol.ocp
+    # with open(f"somersault.pkl", "wb") as f:
+    #     pkl.dump(save, f)
 
 
 if __name__ == "__main__":
