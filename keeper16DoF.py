@@ -16,9 +16,9 @@ from bioptim import (
     ObjectiveFcn,
     InterpolationType,
     BiMappingList,
-    Solver,
     Node,
     ConstraintList,
+    Solver,
 )
 
 
@@ -50,7 +50,7 @@ def prepare_ocp():
     n_shooting = [24, 24, 24, 24]
     phase_time = [1.0, 1.0, 1.0, 1.0]
     final_time_margin = 0.1
-    n_somersault = 1
+    n_somersault = 4
     n_half_twist = [1, 0, 2, 4]
     preferred_twist_side = PreferredTwistSide.LEFT
     somersault_direction = (
@@ -366,13 +366,9 @@ def main():
     # --- Prepare the ocp --- #
     ocp = prepare_ocp()
 
-    # solver = Solver.IPOPT()
+    solver = Solver.IPOPT()
     # --- Solve the ocp --- #
-    solver = Solver.IPOPT(
-        show_online_optim=True, show_options={"show_bounds": True}
-    )  # debug purpose
     sol = ocp.solve(solver=solver)
-    sol.graphs(show_bounds=True)  # debug purpose
     sol.animate()
 
     out = sol.integrate(merge_phases=True)
