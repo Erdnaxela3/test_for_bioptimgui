@@ -329,7 +329,13 @@ def prepare_ocp():
 
     # Declaration of optimization variables bounds and initial guesses
     # Path constraint
-    x_bounds = x_bounds_func()
+    x_bounds = x_bounds_func(
+        n_somersault,
+        bio_model,
+        phase_time,
+        n_half_twist,
+        preferred_twist_side,
+    )
 
     x_inits = x_init_func(
         n_somersault,
@@ -405,13 +411,13 @@ def main():
     # --- Prepare the ocp --- #
     ocp = prepare_ocp()
 
-    # solver = Solver.IPOPT(show_online_optim=True, show_options={"show_bounds": True}) # debug purpose
-    solver = Solver.IPOPT()
+    solver = Solver.IPOPT(show_online_optim=True, show_options={"show_bounds": True}) # debug purpose
+    # solver = Solver.IPOPT()
     # solver.set_maximum_iterations(1000)  # debug purpose
     # --- Solve the ocp --- #
     sol = ocp.solve(solver=solver)
     sol.graphs(show_bounds=True)  # debug purpose
-    sol.animate()
+    sol.animate() # TODO remove
 
     # out = sol.integrate(merge_phases=True)
     # state, time_vector = out._states["unscaled"], out._time_vector
@@ -428,4 +434,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main() # TODO move main down
