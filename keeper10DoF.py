@@ -59,7 +59,9 @@ def prepare_ocp():
         else SomersaultDirection.FORWARD
     )
 
-    bio_model = [BiorbdModel(r"models/AdCh.bioMod") for _ in range(n_somersault)]
+    bio_model = [
+        BiorbdModel(r"models/AdChStraight.bioMod") for _ in range(n_somersault)
+    ]
     # can't use * to have multiple, needs duplication
 
     # Declaration of the constraints and objectives of the ocp
@@ -196,7 +198,7 @@ def prepare_ocp():
 
     # Final and last bounds
     x_bounds[n_somersault - 1]["q"].min[:, 2] = (
-        np.array([-0.9, -0.9, 0, 0, 0, 2.9, 0, 0, 0, -2.9]) - 0.1
+        np.array([-0.9, -0.9, 0, 0, 0, 0.0, 0, 2.9, 0, -2.9]) - 0.1
     )
     x_bounds[n_somersault - 1]["q"].min[3, 2] = (
         2 * np.pi * n_somersault - 0.1
@@ -210,7 +212,7 @@ def prepare_ocp():
     )
 
     x_bounds[n_somersault - 1]["q"].max[:, 2] = (
-        np.array([0.9, 0.9, 0, 0, 0, 2.9, 0, 0, 0, -2.9]) + 0.1
+        np.array([0.9, 0.9, 0, 0, 0, 0.0, 0, 2.9, 0, -2.9]) + 0.1
     )
     x_bounds[n_somersault - 1]["q"].max[3, 2] = (
         2 * np.pi * n_somersault + 0.1
@@ -225,7 +227,7 @@ def prepare_ocp():
 
     # Taken from https://github.com/EveCharbie/AnthropoImpactOnTech/blob/main/TechOpt83.py
     vzinit = (
-        9.81 / 2 * phase_time[0]
+        9.81 / 2 * sum(phase_time)
     )  # vitesse initiale en z du CoM pour revenir a terre au temps final
 
     # Initial bounds
@@ -267,7 +269,7 @@ def prepare_ocp():
 
     x_inits = np.zeros((n_somersault, 2, n_q))
 
-    x_inits[0] = np.array([0, 0, 0, 0, 0, 2.9, 0, 0, 0, -2.9])
+    x_inits[0] = np.array([0, 0, 0, 0, 0, 0.0, 0, 2.9, 0, -2.9])
 
     for phase in range(n_somersault):
         if phase != 0:

@@ -2,6 +2,8 @@
 This file was automatically generated using BioptimGUI version 0.0.1
 """
 
+import pickle as pkl
+
 import numpy as np
 from bioptim import (
     BiorbdModel,
@@ -14,9 +16,9 @@ from bioptim import (
     ObjectiveFcn,
     InterpolationType,
     BiMappingList,
-    Solver,
     Node,
     ConstraintList,
+    Solver,
 )
 
 
@@ -30,22 +32,72 @@ class PreferredTwistSide:
     LEFT = "left"
 
 
-def x_bounds_func(
-    n_somersault,
-    bio_model,
-    phase_time,
-    n_half_twist,
-    preferred_twist_side,
-):
+def prepare_ocp():
+    """
+    This function build an optimal control program and instantiate it.
+    It can be seen as a factory for the OptimalControlProgram class.
+
+    Parameters
+    ----------
+    # TODO fill this section
+
+    Returns
+    -------
+    The OptimalControlProgram ready to be solved
+    """
+
+    # Declaration of generic elements
+    n_somersault = 1
+    n_shooting = [24] * n_somersault
+    phase_time = [1.0] * n_somersault
+    final_time_margin = 0.1
+    n_half_twist = [2]
+    preferred_twist_side = PreferredTwistSide.LEFT
     somersault_direction = (
         SomersaultDirection.BACKWARD
         if sum(n_half_twist) % 2 == 0
         else SomersaultDirection.FORWARD
     )
 
+    bio_model = [BiorbdModel(r"models/AdChTuck.bioMod") for _ in range(n_somersault)]
+    # can't use * to have multiple, needs duplication
+
+    # Declaration of the constraints and objectives of the ocp
+    constraints = ConstraintList()
+    objective_functions = ObjectiveList()
+    objective_functions.add(
+        objective=ObjectiveFcn.Lagrange.MINIMIZE_CONTROL,
+        key="tau",
+        node=Node.ALL_SHOOTING,
+        weight=100.0,
+    )
+    objective_functions.add(
+        objective=ObjectiveFcn.Mayer.MINIMIZE_TIME,
+        min_bound=0.9,
+        max_bound=1.1,
+        node=Node.END,
+        weight=1.0,
+    )
+
+    # Declaration of the dynamics function used during integration
+    dynamics = DynamicsList()
+
+    for phase in range(n_somersault):
+        dynamics.add(
+            DynamicsFcn.TORQUE_DRIVEN,
+            expand=True,
+            phase=phase,
+        )
+
+    # Define control path constraint
+    tau_min, tau_max, tau_init = -100, 100, 0
+
     n_q = bio_model[0].nb_q
     n_qdot = bio_model[0].nb_qdot
+    n_tau = bio_model[0].nb_tau - bio_model[0].nb_root
 
+    # Declaration of optimization variables bounds and initial guesses
+    # Path constraint
     x_bounds = BoundsList()
 
     for phase in range(n_somersault):
@@ -55,12 +107,10 @@ def x_bounds_func(
     # Initial bounds
     x_bounds[0]["q"].min[:, 0] = [0] * n_q
     x_bounds[0]["q"].min[:3, 0] = -0.001
-    x_bounds[0]["q"].min[7, 0] = 2.9
-    x_bounds[0]["q"].min[11, 0] = -2.9
+    x_bounds[0]["q"].min[[7, 11], 0] = 2.9, -2.9
 
     x_bounds[0]["q"].max[:, 0] = -x_bounds[0]["q"].min[:, 0]
-    x_bounds[0]["q"].max[7, 0] = 2.9
-    x_bounds[0]["q"].max[11, 0] = -2.9
+    x_bounds[0]["q"].max[[7, 11], 0] = 2.9, -2.9
 
     intermediate_min_bounds = [
         -1,  # transX
@@ -75,10 +125,11 @@ def x_bounds_func(
         -2.65,  # right forearm arm rotation X
         -2,  # left upper arm rotation Z
         -3,  # left upper arm rotation Y
-        1.1,  # left forearm rotation Z
+        -1.1,  # left forearm rotation Z
         -2.65,  # left forearm arm rotation X
         -2.7,  # thigh rotation X
         -0.1,  # thigh rotation Y
+        -np.pi,
     ]
 
     intermediate_max_bounds = [
@@ -98,6 +149,7 @@ def x_bounds_func(
         0,  # left forearm arm rotation X
         0.3,  # thigh rotation X
         0.1,  # thigh rotation Y
+        np.pi,
     ]
 
     for phase in range(n_somersault):
@@ -158,7 +210,7 @@ def x_bounds_func(
 
     # Final and last bounds
     x_bounds[n_somersault - 1]["q"].min[:, 2] = (
-        np.array([-0.9, -0.9, 0, 0, 0, 0, 0, 2.9, 0, 0, 0, -2.9, 0, 0, 0, 0]) - 0.1
+        np.array([-0.9, -0.9, 0, 0, 0, 0, 0, 2.9, 0, 0, 0, -2.9, 0, 0, 0, 0, 0]) - 0.1
     )
     x_bounds[n_somersault - 1]["q"].min[3, 2] = (
         2 * np.pi * n_somersault - 0.1
@@ -172,7 +224,7 @@ def x_bounds_func(
     )
 
     x_bounds[n_somersault - 1]["q"].max[:, 2] = (
-        np.array([0.9, 0.9, 0, 0, 0, 0, 0, 2.9, 0, 0, 0, -2.9, 0, 0, 0, 0]) + 0.1
+        np.array([0.9, 0.9, 0, 0, 0, 0, 0, 2.9, 0, 0, 0, -2.9, 0, 0, 0, 0, 0]) + 0.1
     )
     x_bounds[n_somersault - 1]["q"].max[3, 2] = (
         2 * np.pi * n_somersault + 0.1
@@ -187,7 +239,7 @@ def x_bounds_func(
 
     # Taken from https://github.com/EveCharbie/AnthropoImpactOnTech/blob/main/TechOpt83.py
     vzinit = (
-        9.81 / 2 * phase_time[0]
+        9.81 / 2 * sum(phase_time)
     )  # vitesse initiale en z du CoM pour revenir a terre au temps final
 
     # Initial bounds
@@ -227,19 +279,9 @@ def x_bounds_func(
         x_bounds[phase]["qdot"].min[:, 2] = x_bounds[phase]["qdot"].min[:, 1]
         x_bounds[phase]["qdot"].max[:, 2] = x_bounds[phase]["qdot"].max[:, 1]
 
-    return x_bounds
-
-
-def x_init_func(n_somersault, n_q, n_half_twist, preferred_twist_side):
-    somersault_direction = (
-        SomersaultDirection.BACKWARD
-        if sum(n_half_twist) % 2 == 0
-        else SomersaultDirection.FORWARD
-    )
-
     x_inits = np.zeros((n_somersault, 2, n_q))
 
-    x_inits[0] = np.array([0, 0, 0, 0, 0, 0, 0, 2.9, 0, 0, 0, -2.9, 0, 0, 0, 0])
+    x_inits[0] = np.array([0, 0, 0, 0, 0, 0, 0, 2.9, 0, 0, 0, -2.9, 0, 0, 0, 0, 0])
 
     for phase in range(n_somersault):
         if phase != 0:
@@ -257,92 +299,7 @@ def x_init_func(n_somersault, n_q, n_half_twist, preferred_twist_side):
             else -np.pi * sum(n_half_twist[: phase + 1])
         )
 
-        x_inits[phase][1][7] = 2.9
-        x_inits[phase][1][11] = -2.9
-
-    return x_inits
-
-
-def prepare_ocp():
-    """
-    This function build an optimal control program and instantiate it.
-    It can be seen as a factory for the OptimalControlProgram class.
-
-    Parameters
-    ----------
-    # TODO fill this section
-
-    Returns
-    -------
-    The OptimalControlProgram ready to be solved
-    """
-
-    # Declaration of generic elements
-    n_shooting = [12]
-    phase_time = [1.0]
-    final_time_margin = 0.1
-    n_somersault = 1
-    n_half_twist = [0]
-    preferred_twist_side = PreferredTwistSide.LEFT
-    somersault_direction = (
-        SomersaultDirection.BACKWARD
-        if sum(n_half_twist) % 2 == 0
-        else SomersaultDirection.FORWARD
-    )
-
-    bio_model = [BiorbdModel(r"models/AdChPike.bioMod") for _ in range(n_somersault)]
-    # can't use * to have multiple, needs duplication
-
-    # Declaration of the constraints and objectives of the ocp
-    constraints = ConstraintList()
-    objective_functions = ObjectiveList()
-    objective_functions.add(
-        objective=ObjectiveFcn.Lagrange.MINIMIZE_CONTROL,
-        key="tau",
-        node=Node.ALL_SHOOTING,
-        weight=100.0,
-    )
-    objective_functions.add(
-        objective=ObjectiveFcn.Mayer.MINIMIZE_TIME,
-        min_bound=0.9,
-        max_bound=1.1,
-        node=Node.END,
-        weight=1.0,
-    )
-
-    # Declaration of the dynamics function used during integration
-    dynamics = DynamicsList()
-
-    for phase in range(n_somersault):
-        dynamics.add(
-            DynamicsFcn.TORQUE_DRIVEN,
-            expand=True,
-            phase=phase,  # don't need it, but keep it for clarity
-        )
-
-    # Define control path constraint
-    tau_min, tau_max, tau_init = -100, 100, 0
-
-    n_q = bio_model[0].nb_q
-    n_qdot = bio_model[0].nb_qdot
-    n_tau = bio_model[0].nb_tau - bio_model[0].nb_root
-
-    # Declaration of optimization variables bounds and initial guesses
-    # Path constraint
-    x_bounds = x_bounds_func(
-        n_somersault,
-        bio_model,
-        phase_time,
-        n_half_twist,
-        preferred_twist_side,
-    )
-
-    x_inits = x_init_func(
-        n_somersault,
-        n_q,
-        n_half_twist,
-        preferred_twist_side,
-    )
+        x_inits[phase][1][[7, 11]] = 2.9, -2.9
 
     x_initial_guesses = InitialGuessList()
 
@@ -381,8 +338,26 @@ def prepare_ocp():
     mapping = BiMappingList()
     mapping.add(
         "tau",
-        to_second=[None, None, None, None, None, None, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-        to_first=[6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+        to_second=[
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+        ],
+        to_first=[6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
     )
 
     # Construct and return the optimal control program (OCP)
@@ -411,29 +386,24 @@ def main():
     # --- Prepare the ocp --- #
     ocp = prepare_ocp()
 
-    solver = Solver.IPOPT(
-        show_online_optim=True, show_options={"show_bounds": True}
-    )  # debug purpose
-    # solver = Solver.IPOPT()
-    # solver.set_maximum_iterations(1000)  # debug purpose
+    solver = Solver.IPOPT()
     # --- Solve the ocp --- #
     sol = ocp.solve(solver=solver)
-    sol.graphs(show_bounds=True)  # debug purpose
-    sol.animate()  # TODO remove
+    sol.animate()
 
-    # out = sol.integrate(merge_phases=True)
-    # state, time_vector = out._states["unscaled"], out._time_vector
-    #
-    # save = {
-    #     "solution": sol,
-    #     "unscaled_state": state,
-    #     "time_vector": time_vector,
-    # }
-    #
-    # del sol.ocp
-    # with open(f"somersault.pkl", "wb") as f:
-    #     pkl.dump(save, f)
+    out = sol.integrate(merge_phases=True)
+    state, time_vector = out._states["unscaled"], out._time_vector
+
+    save = {
+        "solution": sol,
+        "unscaled_state": state,
+        "time_vector": time_vector,
+    }
+
+    del sol.ocp
+    with open(f"somersault.pkl", "wb") as f:
+        pkl.dump(save, f)
 
 
 if __name__ == "__main__":
-    main()  # TODO move main down
+    main()

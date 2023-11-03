@@ -47,10 +47,10 @@ def prepare_ocp():
     """
 
     # Declaration of generic elements
-    n_shooting = [24, 24, 24, 24]
-    phase_time = [1.0, 1.0, 1.0, 1.0]
-    final_time_margin = 0.1
     n_somersault = 4
+    n_shooting = [24] * n_somersault
+    phase_time = [1.0] * n_somersault
+    final_time_margin = 0.1
     n_half_twist = [1, 0, 2, 4]
     preferred_twist_side = PreferredTwistSide.LEFT
     somersault_direction = (
@@ -59,7 +59,7 @@ def prepare_ocp():
         else SomersaultDirection.FORWARD
     )
 
-    bio_model = [BiorbdModel(r"models/AdChfull.bioMod") for _ in range(n_somersault)]
+    bio_model = [BiorbdModel(r"models/AdChPike.bioMod") for _ in range(n_somersault)]
     # can't use * to have multiple, needs duplication
 
     # Declaration of the constraints and objectives of the ocp
@@ -125,7 +125,7 @@ def prepare_ocp():
         -2.65,  # right forearm arm rotation X
         -2,  # left upper arm rotation Z
         -3,  # left upper arm rotation Y
-        1.1,  # left forearm rotation Z
+        -1.1,  # left forearm rotation Z
         -2.65,  # left forearm arm rotation X
         -2.7,  # thigh rotation X
         -0.1,  # thigh rotation Y
@@ -237,7 +237,7 @@ def prepare_ocp():
 
     # Taken from https://github.com/EveCharbie/AnthropoImpactOnTech/blob/main/TechOpt83.py
     vzinit = (
-        9.81 / 2 * phase_time[0]
+        9.81 / 2 * sum(phase_time)
     )  # vitesse initiale en z du CoM pour revenir a terre au temps final
 
     # Initial bounds

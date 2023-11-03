@@ -399,7 +399,7 @@ def test_bounds(
     n_half_twist,
     preferred_twist_side,
 ):
-    bio_model = [BiorbdModel(r"models/AdChfull.bioMod") for _ in range(n_somersault)]
+    bio_model = [BiorbdModel(r"models/AdChPike.bioMod") for _ in range(n_somersault)]
     expected = x_bounds_func_base(
         n_somersault=n_somersault,
         bio_model=bio_model,
@@ -444,7 +444,7 @@ def test_init(
     n_half_twist,
     preferred_twist_side,
 ):
-    bio_model = [BiorbdModel(r"models/AdChfull.bioMod") for _ in range(n_somersault)]
+    bio_model = [BiorbdModel(r"models/AdChPike.bioMod") for _ in range(n_somersault)]
 
     n_q = bio_model[0].nb_q
 
