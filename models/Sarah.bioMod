@@ -95,7 +95,7 @@ segment RightHand
 	meshscale 0.8112244897959183 0.8112244897959183 0.9237288135593221
 endsegment
 
-	marker MidMainD
+	marker MiddleRightHand
 		parent RightHand
 		position 0 0 -0.1
 	endmarker
@@ -147,7 +147,7 @@ segment LeftHand
 	meshscale 0.8112244897959183 0.8112244897959183 0.9237288135593221
 endsegment
 
-	marker MidMainG
+	marker MiddleLeftHand
 		parent LeftHand
 		position 0 0 -0.1
 	endmarker
@@ -183,12 +183,12 @@ segment Shanks
 	meshrt pi 0 0 xyz 0 0 0
 endsegment
 
-	marker CibleMainD
+	marker TargetRightHand
 		parent Shanks
 		position -0.1 0 -0.22
 	endmarker
 
-	marker CibleMainG
+	marker TargetLeftHand
 		parent Shanks
 		position 0.1 0 -0.22
 	endmarker
