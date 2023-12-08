@@ -99,6 +99,11 @@ segment Head
 	meshrt 0 0 pi xyz 0 0 0
 endsegment
 
+marker HeadTop
+	parent Pelvis
+	position 0 0 0.78
+endmarker
+
 segment Eyes
 	parent Head
 	rt 0.0 0.0 0.0 xyz 0.0 -0.055 0.085
